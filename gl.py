@@ -22,13 +22,14 @@ def color(r, g, b):
         int(r * 255)])
 
 class Renderer(object):
-    def __init__(self):
-        self.glInit()
+    def __init__(self, width, height):
+        self.glInit(width, height)
 
-    def glInit(self):
-        self.glCreateWindow(512, 512)
+    def glInit(self, width, height):
+        self.glCreateWindow(width, height)
         self.clearColor = color(0, 0, 0)
         self.currColor = color(1, 1, 1)
+        self.fillColor = color(1, 1, 0)
 
         self.glClear()
 
@@ -72,14 +73,27 @@ class Renderer(object):
 
         self.glPoint(x, y, clr)
 
-    def glFill(self):
+    def glFillPoly(self, poly, clr=None):
         for y in range(self.height):
-            fill = False
             for x in range(self.width):
-                if self.pixels[x][y] != self.clearColor:
-                    fill = not fill
-                if fill == True:
-                    self.pixels = color(0.5, 0.5, 0)
+                if self.EstaenRuta(x, y, poly):
+                    self.pixels[x][y] = clr or self.fillColor
+
+    # Algoritmo obtenido de https://es.wikipedia.org/wiki/Regla_par-impar
+    def EstaenRuta(self, x, y, poly):
+        '''
+        x, y -- x e y coordenadas del punto
+        poly -- una lista de tuplas [(x, y), (x, y), ...]
+        '''
+        num = len(poly)
+        j = num - 1
+        c = False
+        for i in range(num):
+                if  ((poly[i][1] > y) != (poly[j][1] > y)) and \
+                        (x < (poly[j][0] - poly[i][0]) * (y - poly[i][1]) / (poly[j][1] - poly[i][1]) + poly[i][0]):
+                    c = not c
+                j = i
+        return c
     
     def glLine(self, v0, v1, clr = None):
         # Bresenham line algorithm
@@ -128,64 +142,6 @@ class Renderer(object):
             else:
                 # Dibujar de manera horizontal
                 self.glPoint(x, y, clr)
-
-            offset += m
-
-            if offset >= limit:
-                if y0 < y1:
-                    y += 1
-                else:
-                    y -= 1
-                
-                limit += 1
-
-    def glVpLine(self, v0, v1, clr = None):
-        # Bresenham line algorithm
-        # y = m * x + b
-        x0 = v0.x
-        x1 = v1.x
-        y0 = v0.y
-        y1 = v1.y
-
-        # Si el punto0 es igual al punto 1, dibujar solamente un punto
-        if x0 == x1 and y0 == y1:
-            self.glVPoint(x0,y0,clr)
-            return
-
-        dy = abs(y1 - y0)
-        dx = abs(x1 - x0)
-
-        steep = dy > dx
-
-        # Si la linea tiene pendiente mayor a 1 o menor a -1
-        # intercambio las x por las y, y se dibuja la linea
-        # de manera vertical
-        if steep:
-            x0, y0 = y0, x0
-            x1, y1 = y1, x1
-
-        # Si el punto inicial X es mayor que el punto final X,
-        # intercambio los puntos para siempre dibujar de 
-        # izquierda a derecha       
-        if x0 > x1:
-            x0, x1 = x1, x0
-            y0, y1 = y1, y0
-
-        dy = abs(y1 - y0)
-        dx = abs(x1 - x0)
-
-        offset = 0
-        limit = 0.5
-        m = dy / dx
-        y = y0
-
-        for x in range(int(x0 * self.width/2), int(x1 * self.width/2) + 1):
-            if steep:
-                # Dibujar de manera vertical
-                self.glVPoint(y/self.height/2, x/self.width, clr)
-            else:
-                # Dibujar de manera horizontal
-                self.glVPoint(x/self.width, y/self.height, clr)
 
             offset += m
 
