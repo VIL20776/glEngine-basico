@@ -1,7 +1,13 @@
 import struct
+from obj import Obj
+from libAL import Matrix, matrixMult
 from collections import namedtuple
 
+import random
+
 V2 = namedtuple('Point2', ['x', 'y'])
+V3 = namedtuple('Point3', ['x', 'y', 'z'])
+V4 = namedtuple('Point4', ['x', 'y', 'z', 'w'])
 
 def char(c):
     #1 byte
@@ -152,6 +158,114 @@ class Renderer(object):
                     y -= 1
                 
                 limit += 1
+    
+    def glCreateObjectMatrix(self, translate = V3(0,0,0), rotate = V3(0,0,0), scale = V3(1,1,1)):
+
+        translation = Matrix(4, 4, matrix=[[1, 0, 0, translate.x],
+                                        [0, 1, 0, translate.y],
+                                        [0, 0, 1, translate.z],
+                                        [0, 0, 0, 1]])
+
+        rotation = Matrix(4,4)
+        rotation.identity()
+
+        scaleMat = Matrix(4, 4, matrix=[[scale.x, 0, 0, 0],
+                                    [0, scale.y, 0, 0],
+                                    [0, 0, scale.z, 0],
+                                    [0, 0, 0, 1]])
+        M1 = matrixMult(rotation, scaleMat)
+        M2 = matrixMult(translation, M1)
+        return M2
+
+    def glTransform(self, vertex, matrix):
+
+        v = Matrix(4, 1, [[vertex[0]], 
+                            [vertex[1]],
+                            [vertex[2]],
+                            [1]])
+        vt = matrixMult(matrix, v)
+        vf = V3(vt.matrix[0][0]/ vt.matrix[3][0],
+                vt.matrix[1][0]/ vt.matrix[3][0],
+                vt.matrix[2][0]/ vt.matrix[3][0])
+
+        return vf
+
+
+
+    def glLoadModel(self, filename, translate = V3(0,0,0), rotate = V3(0,0,0), scale = V3(1,1,1)):
+        model = Obj(filename)
+        modelMatrix = self.glCreateObjectMatrix(translate, rotate, scale)
+
+        for face in model.faces:
+            vertCount = len(face)
+
+            v0 = model.vertices[ face[0][0] - 1]
+            v1 = model.vertices[ face[1][0] - 1]
+            v2 = model.vertices[ face[2][0] - 1]
+
+            v0 = self.glTransform(v0, modelMatrix)
+            v1 = self.glTransform(v1, modelMatrix)
+            v2 = self.glTransform(v2, modelMatrix)
+
+
+
+            self.glTriangle_std(v0, v1, v2, color(random.random(),
+                                                  random.random(),
+                                                  random.random()))
+
+    def glTriangle_std(self, A, B, C, clr = None):
+        
+        if A.y < B.y:
+            A, B = B, A
+        if A.y < C.y:
+            A, C = C, A
+        if B.y < C.y:
+            B, C = C, B
+
+        self.glLine(A,B, clr)
+        self.glLine(B,C, clr)
+        self.glLine(C,A, clr)
+
+        def flatBottom(vA,vB,vC):
+            try:
+                mBA = (vB.x - vA.x) / (vB.y - vA.y)
+                mCA = (vC.x - vA.x) / (vC.y - vA.y)
+            except:
+                pass
+            else:
+                x0 = vB.x
+                x1 = vC.x
+                for y in range(int(vB.y), int(vA.y)):
+                    self.glLine(V2(x0, y), V2(x1, y), clr)
+                    x0 += mBA
+                    x1 += mCA
+
+        def flatTop(vA,vB,vC):
+            try:
+                mCA = (vC.x - vA.x) / (vC.y - vA.y)
+                mCB = (vC.x - vB.x) / (vC.y - vB.y)
+            except:
+                pass
+            else:
+                x0 = vA.x
+                x1 = vB.x
+                for y in range(int(vA.y), int(vC.y), -1):
+                    self.glLine(V2(x0, y), V2(x1, y), clr)
+                    x0 -= mCA
+                    x1 -= mCB
+
+        if B.y == C.y:
+            # Parte plana abajo
+            flatBottom(A,B,C)
+        elif A.y == B.y:
+            # Parte plana arriba
+            flatTop(A,B,C)
+        else:
+            # Dibujo ambos tipos de triangulos
+            # Teorema de intercepto
+            D = V2( A.x + ((B.y - A.y) / (C.y - A.y)) * (C.x - A.x), B.y)
+            flatBottom(A,B,D)
+            flatTop(B,D,C)
 
     def glFinish(self, filename):
         with open(filename, "wb") as file:
