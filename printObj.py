@@ -6,7 +6,7 @@ height = 520
 rend = Renderer(width, height)
 
 rend.glLoadModel("fox.obj",
-                 translate = V3(width/2, height/2, 0),
-                 scale = V3(200,200,200))
+                 translate = V3(width/2, height/6, 0),
+                 scale = V3(5,5,5))
 
 rend.glFinish("output.bmp")
