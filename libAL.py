@@ -1,3 +1,6 @@
+from math import sqrt
+from collections import namedtuple
+V3 = namedtuple('Point3', ['x', 'y', 'z'])
 class Matrix (object):
     def __init__(self, rows, columns, matrix=None):
         self.rows = rows
@@ -24,4 +27,15 @@ def matrixMult(matrix1, matrix2):
     
     return result
 
-        
+def subsVectors(v1, v2):
+    return V3(v1.x - v2.x, v1.y - v2.y, v1.z - v1.z)
+
+def cross (v1, v2):
+    x = (v1.y * v2.z) - (v1.z * v2.y)
+    y = (v1.x * v2.z) - (v1.z * v2.x)
+    z = (v1.x * v2.y) - (v1.y * v2.x)
+    return V3(x, y, z)
+
+def normalize (vector):
+    magnitude = sqrt(vector.x**2 + vector.y**2 + vector.z**2)
+    return V3(vector.x/magnitude, vector.y/magnitude, vector.z/magnitude)

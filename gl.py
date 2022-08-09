@@ -1,6 +1,7 @@
 import struct
 from obj import Obj
-from libAL import Matrix, matrixMult
+from math import cos, sin, pi
+from libAL import Matrix, matrixMult, subsVectors, cross, normalize
 from collections import namedtuple
 
 import random
@@ -74,6 +75,8 @@ class Renderer(object):
 
     def glClear(self):
         self.pixels = [[self.clearColor for y in range(self.height)]
+            for x in range(self.width)]
+        self.zbuffer = [[ float('inf') for y in range(self.height)]
             for x in range(self.width)]
 
     def glClearViewport(self, clr = None):
@@ -178,7 +181,31 @@ class Renderer(object):
                     y -= 1
                 
                 limit += 1
-    
+
+    def glCreateRotationMatrix(self, pitch = 0, yaw = 0, roll = 0):
+        
+        pitch *= pi/180
+        yaw   *= pi/180
+        roll  *= pi/180
+
+        pitchMat = Matrix(4, 4, [[1, 0, 0, 0],
+                                [0, cos(pitch),-sin(pitch), 0],
+                                [0, sin(pitch), cos(pitch), 0],
+                                [0, 0, 0, 1]])
+
+        yawMat = Matrix(4, 4, [[cos(yaw), 0, sin(yaw), 0],
+                                [0, 1, 0, 0],
+                                [-sin(yaw), 0, cos(yaw), 0],
+                                [0, 0, 0, 1]])
+
+        rollMat = Matrix(4, 4, [[cos(roll),-sin(roll), 0, 0],
+                                [sin(roll), cos(roll), 0, 0],
+                                [0, 0, 1, 0],
+                                [0, 0, 0, 1]])   
+        M1 = matrixMult(yawMat, rollMat)
+        M2 = matrixMult(pitchMat, M1)
+        return M2 
+
     def glCreateObjectMatrix(self, translate = V3(0,0,0), rotate = V3(0,0,0), scale = V3(1,1,1)):
 
         translation = Matrix(4, 4, matrix=[[1, 0, 0, translate.x],
@@ -186,8 +213,7 @@ class Renderer(object):
                                         [0, 0, 1, translate.z],
                                         [0, 0, 0, 1]])
 
-        rotation = Matrix(4,4)
-        rotation.identity()
+        rotation = self.glCreateRotationMatrix(rotate.x, rotate.y, rotate.z)
 
         scaleMat = Matrix(4, 4, matrix=[[scale.x, 0, 0, 0],
                                     [0, scale.y, 0, 0],
@@ -227,11 +253,24 @@ class Renderer(object):
             v1 = self.glTransform(v1, modelMatrix)
             v2 = self.glTransform(v2, modelMatrix)
 
+            vt0 = model.texcoords[face[0][1] - 1]
+            vt1 = model.texcoords[face[1][1] - 1]
+            vt2 = model.texcoords[face[2][1] - 1]
+
+            vn0 = model.normals[face[0][2] - 1]
+            vn1 = model.normals[face[1][2] - 1]
+            vn2 = model.normals[face[2][2] - 1]
+
+            self.glTriangle_bc(v0, v1, v2, texCoords = (vt0, vt1, vt2), normals = (vn0, vn1, vn2))
+
+            if vertCount == 4:
+                v3 = model.vertices[ face[3][0] - 1]
+                v3 = self.glTransform(v3, modelMatrix)
+                vt3 = model.texcoords[face[3][1] - 1]
+                vn3 = model.normals[face[3][2] - 1]
 
 
-            self.glTriangle_std(v0, v1, v2, color(random.random(),
-                                                  random.random(),
-                                                  random.random()))
+                self.glTriangle_bc(v0, v2, v3, texCoords = (vt0, vt2, vt3), normals = (vn0, vn2, vn3))
 
     def glTriangle_std(self, A, B, C, clr = None):
         
@@ -294,9 +333,9 @@ class Renderer(object):
         maxX = round(max(A.x, B.x, C.x))
         maxY = round(max(A.y, B.y, C.y))
 
-        triangleNormal = np.cross( np.subtract(B, A), np.subtract(C,A))
+        triangleNormal = cross(subsVectors(B, A), subsVectors(C,A))
         # normalizar
-        triangleNormal = triangleNormal / np.linalg.norm(triangleNormal)
+        triangleNormal = normalize(triangleNormal)
 
 
         for x in range(minX, maxX + 1):

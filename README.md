@@ -4,3 +4,5 @@ Escritor de imagnes hecho en Python basado en el [codigo hecho en clase](https:/
 SR2: Lines: lines.py
 
 LAB1: Filling: filling.py
+
+SR4: Textures & Flat Shading: textures&Shaders.py
