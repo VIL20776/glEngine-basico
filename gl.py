@@ -27,6 +27,24 @@ def color(r, g, b):
         int(g * 255),
         int(r * 255)])
 
+def baryCoords(A, B, C, P):
+
+    areaPBC = (B.y - C.y) * (P.x - C.x) + (C.x - B.x) * (P.y - C.y)
+    areaPAC = (C.y - A.y) * (P.x - C.x) + (A.x - C.x) * (P.y - C.y)
+    areaABC = (B.y - C.y) * (A.x - C.x) + (C.x - B.x) * (A.y - C.y)
+
+    try:
+        # PBC / ABC
+        u = areaPBC / areaABC
+        # PAC / ABC
+        v = areaPAC / areaABC
+        # 1 - u - v
+        w = 1 - u - v
+    except:
+        return -1, -1, -1
+    else:
+        return u, v, w
+
 class Renderer(object):
     def __init__(self, width, height):
         self.glInit(width, height)
@@ -36,7 +54,9 @@ class Renderer(object):
         self.clearColor = color(0, 0, 0)
         self.currColor = color(1, 1, 1)
         self.fillColor = color(1, 1, 0)
-
+        self.activeShader = None
+        self.active_texture = None
+        self.dirLight = V3(0,0,1)
         self.glClear()
 
     def glCreateWindow(self, width, height):
@@ -266,6 +286,44 @@ class Renderer(object):
             D = V2( A.x + ((B.y - A.y) / (C.y - A.y)) * (C.x - A.x), B.y)
             flatBottom(A,B,D)
             flatTop(B,D,C)
+
+    def glTriangle_bc(self, A, B, C, texCoords = (), normals = (), clr = None):
+        # bounding box
+        minX = round(min(A.x, B.x, C.x))
+        minY = round(min(A.y, B.y, C.y))
+        maxX = round(max(A.x, B.x, C.x))
+        maxY = round(max(A.y, B.y, C.y))
+
+        triangleNormal = np.cross( np.subtract(B, A), np.subtract(C,A))
+        # normalizar
+        triangleNormal = triangleNormal / np.linalg.norm(triangleNormal)
+
+
+        for x in range(minX, maxX + 1):
+            for y in range(minY, maxY + 1):
+                u, v, w = baryCoords(A, B, C, V2(x, y))
+
+                if 0<=u and 0<=v and 0<=w:
+
+                    z = A.z * u + B.z * v + C.z * w
+
+                    if 0<=x<self.width and 0<=y<self.height:
+                        if z < self.zbuffer[x][y]:
+                            self.zbuffer[x][y] = z
+
+                            if self.active_shader:
+                                r, g, b = self.active_shader(self,
+                                                                baryCoords=(u,v,w),
+                                                                vColor = clr or self.currColor,
+                                                                texCoords = texCoords,
+                                                                normals = normals,
+                                                                triangleNormal = triangleNormal)
+
+
+
+                                self.glPoint(x, y, color(r,g,b))
+                            else:
+                                self.glPoint(x,y, clr)
 
     def glFinish(self, filename):
         with open(filename, "wb") as file:
