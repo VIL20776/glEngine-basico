@@ -182,6 +182,37 @@ class Renderer(object):
                 
                 limit += 1
 
+    def glViewMatrix(self, translate = V3(0,0,0), rotate = V3(0,0,0)):
+        self.camMatrix = self.glCreateObjectMatrix(translate, rotate)
+        self.viewMatrix = np.linalg.inv(self.camMatrix)
+
+    def glLookAt(self, eye, camPosition = V3(0,0,0)):
+        forward = subsVectors(camPosition, eye)
+        forward = forward / normalize(forward)
+
+        right = cross(V3(0,1,0), forward)
+        right = right / normalize(right)
+
+        up = cross(forward, right)
+        up = up / normalize(up)
+
+        self.camMatrix = Matrix(4, 4, [[right[0],up[0],forward[0],camPosition[0]],
+                                        [right[1],up[1],forward[1],camPosition[1]],
+                                        [right[2],up[2],forward[2],camPosition[2]],
+                                        [0,0,0,1]])
+
+        self.viewMatrix = np.linalg.inv(self.camMatrix)
+
+    def glProjectionMatrix(self, n = 0.1, f = 1000, fov = 60):
+        aspectRatio = self.vpWidth / self.vpHeight
+        t = tan( (fov * pi / 180) / 2) * n
+        r = t * aspectRatio
+
+        self.projectionMatrix = Matrix(4, 4, [[n/r,0,0,0],
+                                                [0,n/t,0,0],
+                                                [0,0,-(f+n)/(f-n),-(2*f*n)/(f-n)],
+                                                [0,0,-1,0]])
+
     def glCreateRotationMatrix(self, pitch = 0, yaw = 0, roll = 0):
         
         pitch *= pi/180
@@ -236,7 +267,30 @@ class Renderer(object):
 
         return vf
 
+    def glDirTransform(self, dirVector, rotMatrix):
+        v = Matrix(4, 1, [[dirVector[0]],
+                            [dirVector[1]],
+                            [dirVector[2]],
+                            [0]])
+        vt = matrixMult(rotMatrix, v)
+        vf = V3(vt[0][0],
+                vt[1][0],
+                vt[2][0])
+        vf = V3(vt.matrix[0][0]/ vt.matrix[3][0],
+                vt.matrix[1][0]/ vt.matrix[3][0],
+                vt.matrix[2][0]/ vt.matrix[3][0])
 
+        return vf
+
+    def glCamTransform(self, vertex):
+        v = Matrix(4, 1, [[vertex[0]], 
+                            [vertex[1]],
+                            [vertex[2]],
+                            [1]])
+        vt = matrixMult(self.viewportMatrix, matrixMult(self.projectionMatrix, matrixMult(self.viewMatrix, v)))
+        
+
+        return vf
 
     def glLoadModel(self, filename, translate = V3(0,0,0), rotate = V3(0,0,0), scale = V3(1,1,1)):
         model = Obj(filename)
