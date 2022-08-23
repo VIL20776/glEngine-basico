@@ -1,5 +1,5 @@
 #BMP files
-*.bmp
+output.bmp
 
 # Gitignore autogenerado
 

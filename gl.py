@@ -1,7 +1,7 @@
 import struct
 from obj import Obj
 from math import cos, sin, pi
-from libAL import Matrix, matrixMult, subsVectors, cross, normalize
+from libAL import Matrix, matrixMult, subsVectors, cross, normalize, divide
 from collections import namedtuple
 
 import random
@@ -295,6 +295,7 @@ class Renderer(object):
     def glLoadModel(self, filename, translate = V3(0,0,0), rotate = V3(0,0,0), scale = V3(1,1,1)):
         model = Obj(filename)
         modelMatrix = self.glCreateObjectMatrix(translate, rotate, scale)
+        rotationMatrix = self.glCreateRotationMatrix(rotate[0], rotate[1], rotate[2])
 
         for face in model.faces:
             vertCount = len(face)
@@ -315,7 +316,10 @@ class Renderer(object):
             vn1 = model.normals[face[1][2] - 1]
             vn2 = model.normals[face[2][2] - 1]
 
-            self.glTriangle_bc(v0, v1, v2, texCoords = (vt0, vt1, vt2), normals = (vn0, vn1, vn2))
+            self.glTriangle_bc(v0, v1, v2,
+                               verts = (v0, v1, v2),
+                               texCoords = (vt0, vt1, vt2),
+                               normals = (vn0, vn1, vn2))
 
             if vertCount == 4:
                 v3 = model.vertices[ face[3][0] - 1]
@@ -323,8 +327,10 @@ class Renderer(object):
                 vt3 = model.texcoords[face[3][1] - 1]
                 vn3 = model.normals[face[3][2] - 1]
 
-
-                self.glTriangle_bc(v0, v2, v3, texCoords = (vt0, vt2, vt3), normals = (vn0, vn2, vn3))
+                self.glTriangle_bc(v0, v2, v3,
+                                   verts = (v0, v2, v3),
+                                   texCoords = (vt0, vt2, vt3),
+                                   normals = (vn0, vn2, vn3))
 
     def glTriangle_std(self, A, B, C, clr = None):
         
@@ -380,20 +386,35 @@ class Renderer(object):
             flatBottom(A,B,D)
             flatTop(B,D,C)
 
-    def glTriangle_bc(self, A, B, C, texCoords = (), normals = (), clr = None):
+    def glTriangle_bc(self, A, B, C, verts = (), texCoords = (), normals = (), clr = None):
         # bounding box
         minX = round(min(A.x, B.x, C.x))
         minY = round(min(A.y, B.y, C.y))
         maxX = round(max(A.x, B.x, C.x))
         maxY = round(max(A.y, B.y, C.y))
 
-        triangleNormal = cross(subsVectors(B, A), subsVectors(C,A))
-        # normalizar
+        edge1 = subsVectors(verts[1], verts[0])
+        edge2 = subsVectors(verts[2], verts[0])
+
+        triangleNormal = cross( edge1, edge2)
         triangleNormal = normalize(triangleNormal)
 
+        # deltaUV1 = np.subtract(texCoords[1], texCoords[0])
+        # deltaUV2 = np.subtract(texCoords[2], texCoords[0])
+        # f = 1 / (deltaUV1[0]* deltaUV2[1] - deltaUV2[0] * deltaUV1[1])
+
+        # tangent = [f * (deltaUV2[1] * edge1[0] - deltaUV1[1] * edge2[0]),
+        #            f * (deltaUV2[1] * edge1[1] - deltaUV1[1] * edge2[1]),
+        #            f * (deltaUV2[1] * edge1[2] - deltaUV1[1] * edge2[2])]
+        # tangent = divide(tangent, normalize(tangent))
+
+        # bitangent = cross(triangleNormal, tangent)
+        # bitangent = divide(bitangent, normalize(bitangent))
 
         for x in range(minX, maxX + 1):
             for y in range(minY, maxY + 1):
+
+
                 u, v, w = baryCoords(A, B, C, V2(x, y))
 
                 if 0<=u and 0<=v and 0<=w:
@@ -406,11 +427,18 @@ class Renderer(object):
 
                             if self.active_shader:
                                 r, g, b = self.active_shader(self,
-                                                                baryCoords=(u,v,w),
-                                                                vColor = clr or self.currColor,
-                                                                texCoords = texCoords,
-                                                                normals = normals,
-                                                                triangleNormal = triangleNormal)
+                                                             baryCoords=(u,v,w),
+                                                             vColor = clr or self.currColor,
+                                                             verts = verts,
+                                                             texCoords = texCoords,
+                                                             normals = normals,
+                                                             triangleNormal = triangleNormal,
+                                                             point = (x, y),
+                                                             max = (maxX, maxY),
+                                                             min = (minX, minY)
+                                                             # tangent = tangent,
+                                                             # bitangent = bitangent
+                                                             )
 
 
 
